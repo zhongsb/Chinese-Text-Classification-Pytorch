@@ -26,7 +26,7 @@ def init_network(model, method='xavier', exclude='embedding', seed=123):
                 pass
 
 
-def train(config, model, train_iter, dev_iter, test_iter):
+def train(config, model, train_iter, test_iter):
     start_time = time.time()
     model.train()
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
@@ -52,21 +52,21 @@ def train(config, model, train_iter, dev_iter, test_iter):
                 true = labels.data.cpu()
                 predic = torch.max(outputs.data, 1)[1].cpu()
                 train_acc = metrics.accuracy_score(true, predic)
-                dev_acc, dev_loss = evaluate(config, model, dev_iter)
-                if dev_loss < dev_best_loss:
-                    dev_best_loss = dev_loss
-                    torch.save(model.state_dict(), config.save_path)
-                    improve = '*'
-                    last_improve = total_batch
-                else:
-                    improve = ''
-                time_dif = get_time_dif(start_time)
-                msg = 'Iter: {0:>6},  Train Loss: {1:>5.2},  Train Acc: {2:>6.2%},  Val Loss: {3:>5.2},  Val Acc: {4:>6.2%},  Time: {5} {6}'
-                print(msg.format(total_batch, loss.item(), train_acc, dev_loss, dev_acc, time_dif, improve))
+                # dev_acc, dev_loss = evaluate(config, model, dev_iter)
+                # if dev_loss < dev_best_loss:
+                #     dev_best_loss = dev_loss
+                #     torch.save(model.state_dict(), config.save_path)
+                #     improve = '*'
+                #     last_improve = total_batch
+                # else:
+                #     improve = ''
+                # time_dif = get_time_dif(start_time)
+                # msg = 'Iter: {0:>6},  Train Loss: {1:>5.2},  Train Acc: {2:>6.2%},  Val Loss: {3:>5.2},  Val Acc: {4:>6.2%},  Time: {5} {6}'
+                # print(msg.format(total_batch, loss.item(), train_acc, dev_loss, dev_acc, time_dif, improve))
                 writer.add_scalar("loss/train", loss.item(), total_batch)
-                writer.add_scalar("loss/dev", dev_loss, total_batch)
+                # writer.add_scalar("loss/dev", dev_loss, total_batch)
                 writer.add_scalar("acc/train", train_acc, total_batch)
-                writer.add_scalar("acc/dev", dev_acc, total_batch)
+                # writer.add_scalar("acc/dev", dev_acc, total_batch)
                 model.train()
             total_batch += 1
             if total_batch - last_improve > config.require_improvement:
@@ -110,6 +110,10 @@ def evaluate(config, model, data_iter, test=False):
             predic = torch.max(outputs.data, 1)[1].cpu().numpy()
             labels_all = np.append(labels_all, labels)
             predict_all = np.append(predict_all, predic)
+            with open('./THUCNews/data/result.txt', 'w', encoding='utf-8') as f:  # 使用with open()新建对象f
+                for i in predict_all:
+                    f.write(str(i) + '\n')
+            # np.savetxt("./data/result.text", predict_all)
 
     acc = metrics.accuracy_score(labels_all, predict_all)
     if test:
