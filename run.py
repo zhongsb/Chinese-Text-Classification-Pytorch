@@ -36,12 +36,12 @@ if __name__ == '__main__':
 
     start_time = time.time()
     print("Loading data...")
-    vocab, train_data, test_data = build_dataset(config, args.word)
+    vocab, train_data, dev_data, test_data = build_dataset(config, args.word)
     train_iter = build_iterator(train_data, config)
+    dev_iter = build_iterator(dev_data, config)
     test_iter = build_iterator(test_data, config)
     time_dif = get_time_dif(start_time)
     print("Time usage:", time_dif)
-
 
     # train
     config.n_vocab = len(vocab)
@@ -49,4 +49,4 @@ if __name__ == '__main__':
     if model_name != 'Transformer':
         init_network(model)
     print(model.parameters)
-    train(config, model, train_iter, test_iter)
+    train(config, model, train_iter, dev_iter, test_iter)

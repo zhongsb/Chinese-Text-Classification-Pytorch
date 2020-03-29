@@ -34,7 +34,15 @@ def build_dataset(config, ues_word):
     else:
         tokenizer = lambda x: [y for y in x]  # char-level
     if os.path.exists(config.vocab_path):
-        vocab = pkl.load(open(config.vocab_path, 'rb'))
+        # vocab = pkl.load(open(config.vocab_path, 'rb'))
+        # 字典文件修改为paddle竞赛数据
+        with open(os.path.abspath(config.vocab_path), 'r', encoding='utf-8') as f_data:
+            dict_txt = eval(f_data.readlines()[0])
+            vocab = dict(dict_txt)
+        print("vocab: " + str(type(vocab)))
+        vocab['<PAD>'] = 5307
+        vocab[':'] = 5308
+        vocab["''"] = 5309
     else:
         vocab = build_vocab(config.train_path, tokenizer=tokenizer, max_size=MAX_VOCAB_SIZE, min_freq=1)
         pkl.dump(vocab, open(config.vocab_path, 'wb'))
@@ -56,7 +64,14 @@ def build_dataset(config, ues_word):
                 lin = line.strip()
                 if not lin:
                     continue
-                content, label = lin.split('\t')
+                label = ''
+                labelvalue = ''
+                content = ''
+                if len(lin.split('\t')) == 2:
+                    continue
+                elif len(lin.split('\t')) == 3:
+                    label, labelvalue, content = lin.split('\t')
+                # content, label = lin.split('\t')
                 words_line = []
                 token = tokenizer(content)
                 seq_len = len(token)
@@ -81,9 +96,82 @@ def build_dataset(config, ues_word):
                 # -----------------
                 contents.append((words_line, int(label), seq_len, bigram, trigram))
         return contents  # [([...], 0), ([...], 1), ...]
+    def load_valdataset(path, pad_size=32):
+        contents = []
+        with open(path, 'r', encoding='UTF-8') as f:
+            for line in tqdm(f):
+                lin = line.strip()
+                if not lin:
+                    continue
+                content, label = lin.split('\t')
+                words_line2 = content.split(",")
+                words_line = []
+                seq_len = len(words_line2)
+                if pad_size:
+                    if len(words_line2) < pad_size:
+                        #  句子太短，填充PAD
+                        words_line2.extend(['5307'] * (pad_size - len(words_line2)))
+                    else:
+                        # 句子太长，截断
+                        seq_len = pad_size
+                        words_line2 = words_line2[0:pad_size]
+                # word to id
+                # for word in words_line2:
+                #     if word == PAD:
+                #         words_line.append(vocab.get(word, vocab.get(UNK)))
+                for word in words_line2:
+                    words_line.append(int(word))
+                if len(words_line) != 32:
+                    print("解析val数据错误")
+                # fasttext ngram
+                buckets = config.n_gram_vocab
+                bigram = []
+                trigram = []
+                # ------ngram------
+                for i in range(pad_size):
+                    bigram.append(biGramHash(words_line, i, buckets))
+                    trigram.append(triGramHash(words_line, i, buckets))
+                # -----------------
+                contents.append((words_line, int(label), seq_len, bigram, trigram))
+        return contents  # [([...], 0), ([...], 1), ...]
+    # 加载测试数据
+    def load_testdata(path, pad_size=32):
+        contents = []
+        with open(path, 'r', encoding='UTF-8') as f:
+            for line in tqdm(f):
+                lin = line.strip()
+                if not lin:
+                    continue
+                content = lin
+                words_line = []
+                token = tokenizer(content)
+                seq_len = len(token)
+                if pad_size:
+                    if len(token) < pad_size:
+                        token.extend([PAD] * (pad_size - len(token)))
+                    else:
+                        token = token[:pad_size]
+                        seq_len = pad_size
+                # word to id
+                for word in token:
+                    words_line.append(vocab.get(word, vocab.get(UNK)))
+
+                # fasttext ngram
+                buckets = config.n_gram_vocab
+                bigram = []
+                trigram = []
+                # ------ngram------
+                for i in range(pad_size):
+                    bigram.append(biGramHash(words_line, i, buckets))
+                    trigram.append(triGramHash(words_line, i, buckets))
+                # -----------------
+                contents.append((words_line, "", seq_len, bigram, trigram))
+        return contents  # [([...], 0), ([...], 1), ...]
     train = load_dataset(config.train_path, config.pad_size)
-    test = load_dataset(config.test_path, config.pad_size)
-    return vocab, train, test
+    dev = load_valdataset(config.dev_path, config.pad_size)
+    test = load_testdata(config.test_path, config.pad_size)
+    return vocab, train, dev, test
+    # return vocab, "", "", ""
 
 
 class DatasetIterater(object):
@@ -91,7 +179,7 @@ class DatasetIterater(object):
         self.batch_size = batch_size
         self.batches = batches
         self.n_batches = len(batches) // batch_size
-        self.residue = False  # 记录batch数量是否为整数 
+        self.residue = False  # 记录batch数量是否为整数
         if len(batches) % self.n_batches != 0:
             self.residue = True
         self.index = 0

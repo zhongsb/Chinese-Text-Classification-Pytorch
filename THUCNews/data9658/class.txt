@@ -1,0 +1,14 @@
+finance
+lottery
+realty
+stocks
+household
+education
+science
+society
+fashion
+politics
+sports
+constellation
+game
+entertainment
